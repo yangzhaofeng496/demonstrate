@@ -1,0 +1,9 @@
+<launch>
+    <arg name="record_cartesian" default="true"/>
+    <arg name="output_file" default="$(find demonstrate)/path/HXD1C_test.csv"/>
+
+    <node pkg="demonstrate" type="demonstrate.py" name="demonstrate_node" output="screen">
+        <param name="record_cartesian" value="$(arg record_cartesian)"/>
+        <param name="output_file" value="$(arg output_file)"/>
+    </node>
+</launch>
