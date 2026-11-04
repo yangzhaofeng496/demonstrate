@@ -1,8 +1,13 @@
 <launch>
     <arg name="record_cartesian" default="true"/>
-    <arg name="output_file" default="$(find demonstrate)/path/HXD1C_test.csv"/>
+    <!-- 输出目录与文件名、新增列、图像、光源与过渡点参数集中在配置文件 -->
+    <arg name="config" default="$(find demonstrate)/config/demonstrate.yaml"/>
+    <!-- 整路径覆盖，通常留空；填了会覆盖配置文件里的 output_dir + output_file_name -->
+    <arg name="output_file" default=""/>
 
     <node pkg="demonstrate" type="demonstrate.py" name="demonstrate_node" output="screen">
+        <!-- subst_value 用于展开配置文件里的 $(find ...) -->
+        <rosparam command="load" file="$(arg config)" subst_value="true"/>
         <param name="record_cartesian" value="$(arg record_cartesian)"/>
         <param name="output_file" value="$(arg output_file)"/>
     </node>

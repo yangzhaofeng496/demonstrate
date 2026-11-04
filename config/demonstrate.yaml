@@ -1,0 +1,55 @@
+# demonstrate 示教记录参数
+# 只影响新增的末端位姿 / 图像 / 光源 / 过渡点行为，
+# 原有 18 列与可选 tcp_* 六列的格式不受这些参数影响。
+
+# ---- 输出位置 ----
+# 示教 CSV 的目录与文件名。$(find <包名>) 由 launch 的 subst_value 展开，
+# 与 patrol.yaml 的 waypoints_dir_path / waypoints_file_name 写法一致。
+output_dir: '$(find demonstrate)/path/'
+output_file_name: HXD1C_test.csv
+# 整路径覆盖，通常留空；填了则忽略上面两项（调试用）。
+output_file: ''
+# 项点照片目录；留空表示 <CSV 所在目录>/<CSV 文件名>_images/
+image_dir: ''
+
+# ---- 坐标系 ----
+# 新增位姿列所表达的地图坐标系，同时写入 CSV 的 map_frame 列。
+map_frame: map
+# 底盘坐标系，与定位系统发布的 map -> base_link 对应。
+base_frame: base_link
+# 单次 TF 查询超时，单位秒。
+tf_timeout: 0.2
+
+# ---- 末端位姿（需求 2）----
+# 直接查询 map_frame -> ee_frame 的 TF，不做任何外参拼接；
+# 位置按米、姿态按弧度记录。必须与实际 URDF 中的末端坐标系一致，
+# 留空则关闭该功能、ee_* 列全部留空。
+ee_frame: Link6
+
+# ---- 图像旋转角（需求 4）----
+# 相机光学系（+X 右、+Y 下、+Z 光轴）在 TF 中的坐标系名。
+# 留空或 TF 中不存在时，image_rotation_deg 列留空。
+camera_frame: ''
+
+# ---- 拍照（需求 4）----
+# 末端相机图像话题；留空则完全关闭拍照。
+image_topic: /camera/image_raw
+image_encoding: bgr8
+# 触发记录时允许的最大图像延迟，单位秒。
+image_max_age: 0.5
+image_format: png
+# 是否要求必须拍到图像：false 时相机异常只告警、不丢示教行。
+require_image: false
+
+# ---- 光源（只读，不改动灯光节点）----
+# teleop_joy_ctrl 以 latch 方式发布这两个话题，被动订阅即可；留空则记录空值。
+light_brightness_topic: /light/brightness_cmd
+light_power_topic: /light/power_cmd
+
+# ---- 过渡点（需求 3）----
+# false：过渡点沿用上一个正式项点的底盘位姿（底盘不动）；
+# true：过渡点也记录实时底盘位姿。
+transition_record_base: false
+# 沿用底盘位姿时的偏差告警阈值：距离（米）与角度（度）。
+transition_base_warn_distance: 0.05
+transition_base_warn_angle_deg: 3.0
