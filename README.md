@@ -41,7 +41,7 @@ image_dir: ''                               # 空表示 <CSV 目录>/<CSV 名>_i
 | `ee_*`（新增） | TF `map → ee_frame`（定位 + URDF 臂链的融合结果） | `lookup_transform` | 四元数 → rpy | 1 |
 | `image_file` | `/camera/image_raw` 图像帧 | 订阅 | `cv_bridge` 解码 → PNG 编码 | 1 |
 | `image_rotation_deg` | TF `map → camera_frame` 的四元数 | `lookup_transform` | 四元数 → 3x3 → `atan2` | 2 |
-| `light_brightness` / `light_on` | `/light/brightness_cmd`、`/light/power_cmd` | 订阅（latch） | **无** | 0 |
+| `light_white_brightness` / `light_white_on` | `moma_light` 轮询到的 `/light/state` | 订阅（latch） | **无**，取白光通道原值 0-255 | 0 |
 
 因为 TF 树本身已经融合了定位、里程计与 URDF，末端位姿与相机朝向各只需要**一次查询**；节点内没有任何外参拼接、毫米↔米或度↔弧度换算。位姿数学全部使用 ROS 自带实现（`tf2_ros.Buffer`、`tf.transformations`、`numpy`），不维护自定义几何库。
 
@@ -57,8 +57,7 @@ image_dir: ''                               # 空表示 <CSV 目录>/<CSV 名>_i
 | `/dobot_v4_bringup/msg/ToolVectorActual` | `dobot_v4_bringup/ToolVectorActual` | 控制器 TCP（毫米/度） |
 | `/dobot_v4_bringup/msg/RobotStatus` | `dobot_v4_bringup/RobotStatus` | 机械臂连接状态 |
 | `/camera/image_raw` | `sensor_msgs/Image` | 末端相机图像 |
-| `/light/brightness_cmd` | `std_msgs/Float32` | 光源亮度指令（只读） |
-| `/light/power_cmd` | `std_msgs/Bool` | 光源开关指令（只读） |
+| `/light/state` | `moma_light/LightState` | 光源真实状态（latched，取 `white` 通道） |
 
 服务：`trigger_record`（`std_srvs/Trigger`），与手柄等效。
 
@@ -82,8 +81,8 @@ image_dir: ''                               # 空表示 <CSV 目录>/<CSV 名>_i
 | `ee_rx_rad` `ee_ry_rad` `ee_rz_rad` | rad | 末端姿态，固定轴 X-Y-Z 欧拉角 |
 | `image_file` | — | 图片文件名，如 `1.png`；过渡点为空 |
 | `image_rotation_deg` | ° | 见下文“图像旋转角” |
-| `light_brightness` | 0–1 | 最后一次亮度指令；未收到时留空 |
-| `light_on` | `true`/`false` | 最后一次开关指令 |
+| `light_white_brightness` | 0–255 | 白光通道亮度（`/light/state` 轮询值）；未收到时留空 |
+| `light_white_on` | `true`/`false` | 白光通道开关状态 |
 
 新增列取不到数据时留空并限频告警，**不影响整行写入**。原有列不降级：`record_cartesian=true` 而机械臂位姿不可用时，仍然整行不写（与旧版一致）。
 
@@ -134,7 +133,19 @@ g_cam = Rᵀ · (0, 0, -1) = -R[2, :]        # 重力在相机系中的表示
 
 ## 光源亮度
 
-只被动订阅 `teleop_joy_ctrl` 已有的 latch 话题，不改动灯光节点。记录的是**指令值**，不是串口回读值；`teleop_joy_ctrl` 只在用户操作后才发布，因此会话首次调节光源之前这两列为空。
+数据来自 `moma_light`（4 通道 RGBW 光源控制包）：`light_control_node` 以 `poll_rate`（默认 5 Hz）轮询串口，并把结果以 latched 方式发布到 `/light/state`，demonstrate **只订阅、不下命令**。
+
+当前**只记录白光通道**：
+
+| 列 | 取值 |
+| --- | --- |
+| `light_white_brightness` | `LightState.white.brightness`，0–255 整数 |
+| `light_white_on` | `LightState.white.on` |
+
+`LightState` 按颜色名暴露 `red`/`green`/`blue`/`white` 四个 `LightChannel`，因此后续要加 RGB 通道只需扩列，无需改节点。
+
+亮度记的是**轮询回读的真实寄存器值**，不是指令值；`moma_light` 未编译或话题无数据时两列留空（节点仍可正常运行，启动时打一条 `logerr`）。
+
 
 ## 离线校验与测试
 
