@@ -78,6 +78,17 @@ def _transform(x=0.0, y=0.0, z=0.0, rpy=(0.0, 0.0, 0.0)):
     return stamped
 
 
+def _light_state(white_on=True, white_rate=0, red_rate=255, green_on=True):
+    """构造 moma_light/LightState：颜色为第一级，开关/亮度为第二级。"""
+    def channel(on, brightness):
+        return types.SimpleNamespace(on=on, brightness=brightness)
+    return types.SimpleNamespace(
+        red=channel(True, red_rate),
+        green=channel(green_on, 64),
+        blue=channel(True, 32),
+        white=channel(white_on, white_rate))
+
+
 def _rotation_matrix(rx_deg, ry_deg, rz_deg):
     """R = Rz·Ry·Rx，用于旋转角的第一性验证，不依赖桩件。"""
     rx, ry, rz = (math.radians(v) for v in (rx_deg, ry_deg, rz_deg))
@@ -181,13 +192,16 @@ def _install_stubs():
             ('nav_msgs', {}),
             ('nav_msgs.msg', {'Odometry': _Msg}),
             ('std_msgs', {}),
-            ('std_msgs.msg', {'Bool': _Msg, 'Float32': _Msg}),
+            ('std_msgs.msg', {}),
             ('std_srvs', {}),
             ('std_srvs.srv', {'Trigger': lambda: None,
                               'TriggerResponse': lambda **kw: kw}),
             ('dobot_v4_bringup', {}),
             ('dobot_v4_bringup.msg', {'ToolVectorActual': _Msg,
-                                      'RobotStatus': _Msg})):
+                                      'RobotStatus': _Msg}),
+            ('moma_light', {}),
+            ('moma_light.msg', {'LightState': _Msg,
+                                'LightChannel': _Msg})):
         module = types.ModuleType(package)
         for key, value in attrs.items():
             setattr(module, key, value)
@@ -233,8 +247,7 @@ class WriteRecordTest(unittest.TestCase):
             'image_max_age': 0.5,
             'image_format': 'png',
             'require_image': False,
-            'light_brightness_topic': '/light/brightness_cmd',
-            'light_power_topic': '/light/power_cmd',
+            'light_state_topic': '/light/state',
             'transition_record_base': False,
             'transition_base_warn_distance': 0.05,
             'transition_base_warn_angle_deg': 3.0,
@@ -284,8 +297,7 @@ class WriteRecordTest(unittest.TestCase):
         self.feed_arm()
         self.send('/camera/image_raw',
                   types.SimpleNamespace(payload=b'fake-frame'))
-        self.send('/light/brightness_cmd', types.SimpleNamespace(data=0.2))
-        self.send('/light/power_cmd', types.SimpleNamespace(data=True))
+        self.send('/light/state', _light_state(white_on=True, white_rate=128))
 
     def feed_odom(self, x, y, yaw_deg=0.0):
         Stub.transforms[('map', 'base_link')] = _transform(
@@ -449,8 +461,30 @@ class WriteRecordTest(unittest.TestCase):
         self.node.write_record(False)
         header, rows = self.read_csv()
         record = dict(zip(header, rows[0]))
-        self.assertEqual(record['light_brightness'], '0.200')
-        self.assertEqual(record['light_on'], 'true')
+        self.assertEqual(record['light_white_brightness'], '128')
+        self.assertEqual(record['light_white_on'], 'true')
+        # 只记录白光：其他通道不上报也不影响
+        self.assertEqual(record['ee_frame'], '')
+
+    def test_light_columns_empty_without_state(self):
+        self.feed_arm()
+        self.feed_odom(1.0, 2.0)
+        self.node.write_record(False)
+        header, rows = self.read_csv()
+        record = dict(zip(header, rows[0]))
+        self.assertEqual(record['light_white_brightness'], '')
+        self.assertEqual(record['light_white_on'], '')
+
+    def test_light_brightness_zero_is_recorded(self):
+        # 亮度 0 是合法值，不能被当成“没数据”丢掉
+        self.feed_arm()
+        self.send('/light/state', _light_state(white_on=False, white_rate=0))
+        self.feed_odom(1.0, 2.0)
+        self.node.write_record(False)
+        header, rows = self.read_csv()
+        record = dict(zip(header, rows[0]))
+        self.assertEqual(record['light_white_brightness'], '0')
+        self.assertEqual(record['light_white_on'], 'false')
 
     # -- 图像旋转角 -------------------------------------------------------
     def test_rotation_angle_known_values(self):

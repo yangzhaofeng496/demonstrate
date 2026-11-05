@@ -110,14 +110,18 @@ def check_row(index, row, header, cartesian):
         if record[name].strip():
             parse_float(record[name], '%s %s' % (where, name))
 
-    if record['light_brightness'].strip():
+    if record['light_white_brightness'].strip():
         brightness = parse_float(
-            record['light_brightness'], '%s light_brightness' % where)
-        if brightness is not None and not 0.0 <= brightness <= 1.0:
-            fail('%s: light_brightness %s 不在 0..1 之间' % (where, brightness))
-    if record['light_on'].strip() and record['light_on'] not in ('true', 'false'):
-        fail('%s: light_on 只能是 true/false，实际 %r'
-             % (where, record['light_on']))
+            record['light_white_brightness'], '%s light_white_brightness' % where)
+        if brightness is not None and not 0 <= brightness <= 255:
+            fail('%s: light_white_brightness %s 不在 0..255 之间'
+                 % (where, brightness))
+        elif brightness is not None and brightness != int(brightness):
+            fail('%s: light_white_brightness 应为整数，实际 %s' % (where, brightness))
+    if (record['light_white_on'].strip()
+            and record['light_white_on'] not in ('true', 'false')):
+        fail('%s: light_white_on 只能是 true/false，实际 %r'
+             % (where, record['light_white_on']))
     if not record['map_frame'].strip():
         fail('%s: map_frame 不能为空' % where)
 
@@ -187,7 +191,7 @@ def make_sample(cartesian, path):
         'map', 'ToolVectorActual',
         '1.250000', '-0.400000', '1.235000',
         '-1.570796', '0.000000', '0.785398',
-        '1.png', '12.500', '0.200', 'true',
+        '1.png', '12.500', '128', 'true',
     ]
     transition = [
         '-1', '1.250', '-0.400', '0.785',
@@ -198,7 +202,7 @@ def make_sample(cartesian, path):
         'map', 'ToolVectorActual',
         '1.250000', '-0.400000', '1.235000',
         '-1.570796', '0.000000', '0.785398',
-        '', '', '0.200', 'true',
+        '', '', '128', 'true',
     ]
     rows = [normal, transition]
     if not cartesian:

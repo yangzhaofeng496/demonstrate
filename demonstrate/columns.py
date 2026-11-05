@@ -28,7 +28,7 @@ HEADER_EXT = [
     'ee_x_m', 'ee_y_m', 'ee_z_m',
     'ee_rx_rad', 'ee_ry_rad', 'ee_rz_rad',
     'image_file', 'image_rotation_deg',
-    'light_brightness', 'light_on',
+    'light_white_brightness', 'light_white_on',
 ]
 
 # 新增列中的数值列，供校验脚本判断是否需要按浮点数解析。

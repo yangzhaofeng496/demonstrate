@@ -13,7 +13,6 @@ import tf2_ros
 from dobot_v4_bringup.msg import RobotStatus, ToolVectorActual
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import Image, JointState, Joy
-from std_msgs.msg import Bool, Float32
 from std_srvs.srv import Trigger, TriggerResponse
 from tf.transformations import euler_from_quaternion, quaternion_matrix
 
@@ -21,6 +20,14 @@ try:
     from .columns import TRANSITION_POINT_NAME, header
 except ImportError:
     from columns import TRANSITION_POINT_NAME, header  # type: ignore[no-redef]
+
+try:
+    from moma_light.msg import LightState
+except ImportError as import_error:  # 光源包未编译时只关闭光源记录
+    LightState = None
+    LIGHT_IMPORT_ERROR = import_error
+else:
+    LIGHT_IMPORT_ERROR = None
 
 try:
     import cv2
@@ -92,13 +99,10 @@ class DemonstrateTemplateNode:
         self.image_msg = None
         self.image_at = None
 
-        # 光源参数：只被动订阅，不改动灯光节点
-        self.light_brightness_topic = str(
-            rospy.get_param('~light_brightness_topic', '/light/brightness_cmd'))
-        self.light_power_topic = str(
-            rospy.get_param('~light_power_topic', '/light/power_cmd'))
-        self.light_brightness = None
-        self.light_on = None
+        # 光源参数：只被动订阅 moma_light 的状态话题，当前仅记录白光通道
+        self.light_state_topic = str(
+            rospy.get_param('~light_state_topic', '/light/state'))
+        self.light_white = None  # (on: bool, brightness: int 0-255)
 
         # 过渡点参数
         self.transition_record_base = bool(
@@ -178,14 +182,15 @@ class DemonstrateTemplateNode:
                 self.image_subscriber = rospy.Subscriber(
                     self.image_topic, Image, self.image_callback, queue_size=1)
 
-        if self.light_brightness_topic:
-            rospy.Subscriber(
-                self.light_brightness_topic, Float32,
-                self.light_brightness_callback, queue_size=1)
-        if self.light_power_topic:
-            rospy.Subscriber(
-                self.light_power_topic, Bool,
-                self.light_power_callback, queue_size=1)
+        if self.light_state_topic:
+            if LightState is None:
+                rospy.logerr(
+                    'moma_light 不可导入（%s），本次不记录光源', LIGHT_IMPORT_ERROR)
+                self.light_state_topic = ''
+            else:
+                rospy.Subscriber(
+                    self.light_state_topic, LightState,
+                    self.light_state_callback, queue_size=1)
 
         self.record_service = rospy.Service(
             'trigger_record',
@@ -275,13 +280,10 @@ class DemonstrateTemplateNode:
             self.image_msg = msg
             self.image_at = time.monotonic()
 
-    def light_brightness_callback(self, msg):
+    def light_state_callback(self, msg):
+        """缓存白光通道状态；LightState 只按颜色名暴露，不出现通道号。"""
         with self.record_lock:
-            self.light_brightness = float(msg.data)
-
-    def light_power_callback(self, msg):
-        with self.record_lock:
-            self.light_on = bool(msg.data)
+            self.light_white = (bool(msg.white.on), int(msg.white.brightness))
 
     def read_tool_pose_snapshot(self):
         """读取机械臂 TCP 快照，返回 ``(values, error)``。
@@ -490,8 +492,7 @@ class DemonstrateTemplateNode:
             with self.record_lock:
                 previous_pose = self.last_base_pose
                 live_pose = (self.chas_x, self.chas_y, self.chas_yaw)
-                light_brightness = self.light_brightness
-                light_on = self.light_on
+                light_white = self.light_white
 
             tool_pose = []
             if self.record_cartesian:
@@ -527,8 +528,8 @@ class DemonstrateTemplateNode:
                 *(ee_pose or [''] * 6),
                 image_name,
                 '' if rotation_deg is None else f'{rotation_deg:.3f}',
-                '' if light_brightness is None else f'{light_brightness:.3f}',
-                '' if light_on is None else ('true' if light_on else 'false'),
+                '' if light_white is None else str(light_white[1]),
+                '' if light_white is None else ('true' if light_white[0] else 'false'),
             ]
 
             # 以下说明对应原来的 18 列：

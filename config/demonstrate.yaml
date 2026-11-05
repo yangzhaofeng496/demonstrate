@@ -41,10 +41,10 @@ image_format: png
 # 是否要求必须拍到图像：false 时相机异常只告警、不丢示教行。
 require_image: false
 
-# ---- 光源（只读，不改动灯光节点）----
-# teleop_joy_ctrl 以 latch 方式发布这两个话题，被动订阅即可；留空则记录空值。
-light_brightness_topic: /light/brightness_cmd
-light_power_topic: /light/power_cmd
+# ---- 光源（只读，来自 moma_light）----
+# moma_light/light_control_node 以 latch 方式发布 /light/state（轮询得到的真实状态）。
+# 当前只记录白光通道：brightness 为 0-255，on 为开关状态。留空则记录空值。
+light_state_topic: /light/state
 
 # ---- 过渡点（需求 3）----
 # false：过渡点沿用上一个正式项点的底盘位姿（底盘不动）；
