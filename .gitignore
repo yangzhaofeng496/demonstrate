@@ -4,3 +4,5 @@ build/
 devel/
 install/
 log/
+*.csv
+*.png

@@ -1,6 +1,6 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-
+import sys
 import csv
 import math
 import os
@@ -16,10 +16,9 @@ from sensor_msgs.msg import Image, JointState, Joy
 from std_srvs.srv import Trigger, TriggerResponse
 from tf.transformations import euler_from_quaternion, quaternion_matrix
 
-try:
-    from .columns import TRANSITION_POINT_NAME, header
-except ImportError:
-    from columns import TRANSITION_POINT_NAME, header  # type: ignore[no-redef]
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from columns import TRANSITION_POINT_NAME, header
+    
 
 try:
     from moma_light.msg import LightState

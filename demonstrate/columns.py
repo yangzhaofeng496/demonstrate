@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """示教 CSV 的列定义，单独成模块以便节点与离线校验脚本共用。
 

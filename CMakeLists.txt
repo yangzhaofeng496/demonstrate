@@ -170,7 +170,6 @@ include_directories(
 # )
 catkin_install_python(PROGRAMS
   demonstrate/demonstrate.py
-  demonstrate/columns.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

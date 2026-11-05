@@ -3,7 +3,7 @@
 # 原有 18 列与可选 tcp_* 六列的格式不受这些参数影响。
 
 # ---- 输出位置 ----
-# 示教 CSV 的目录与文件名。$(find <包名>) 由 launch 的 subst_value 展开，
+# 示教 CSV 的目录与文件名。find 由 launch 的 subst_value 展开，
 # 与 patrol.yaml 的 waypoints_dir_path / waypoints_file_name 写法一致。
 output_dir: '$(find demonstrate)/path/'
 output_file_name: HXD1C_test.csv
